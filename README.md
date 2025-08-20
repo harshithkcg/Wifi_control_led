@@ -1,40 +1,65 @@
-# Wifi_control_led
 #include <ESP8266WiFi.h>
 #include <ESPAsyncTCP.h>
 #include <ESPAsyncWebServer.h>
-#include <LiquidCrystal.h>  
+#include <LiquidCrystal.h>
+
+// LCD setup
 LiquidCrystal lcd(D0, D1, D2, D3, D4, D5);
- 
+
+// WebServer
 AsyncWebServer server(80);
- 
-const char* ssid = "HARSHITH_K";  //wifi ssid
-const char* password = "Sagarshr";   //wifi password
- 
+
+// WiFi credentials
+const char* ssid = "HARSHITH_K";
+const char* password = "Sagarshr";
+
+// Parameters
 const char* PARAM_INPUT_1 = "input1";
- 
+const char* PARAM_LED = "led";
+
+// LED pin
+const int ledPin = D6;  // you can change to any GPIO pin
+
+// HTML page
 const char index_html[] PROGMEM = R"rawliteral(
-<!DOCTYPE HTML><html><head>
-  <title>Smart Notice Board</title>
-  <meta name="viewport" content="width=device-width, initial-scale=5">
-<p> <font size="9" face="sans-serif"> <marquee> Smart Notice Board </marquee> </font> </p>
-  </head><body><center>
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Smart Notice Board + LED</title>
+</head>
+<body>
+  <h1>Smart Notice Board</h1>
   <form action="/get">
-    Enter Text to Display: <input type="text" name="input1">
+    <label>Enter Text to Display:</label><br>
+    <input type="text" name="input1">
     <input type="submit" value="Send">
-  </form><br>
- 
-</center></body></html>)rawliteral";
- 
+  </form>
+  <h2>LED Control</h2>
+  <a href="/led?state=on"><button>Turn ON</button></a>
+  <a href="/led?state=off"><button>Turn OFF</button></a>
+</body>
+</html>
+)rawliteral";
+
+// Not Found handler
 void notFound(AsyncWebServerRequest *request) {
   request->send(404, "text/plain", "Not found");
 }
- 
+
 void setup() {
   Serial.begin(115200);
-   lcd.begin(16, 2);
-   lcd.clear();
-   lcd.setCursor(0, 0);
-   lcd.print("Smart Notice Board");
+
+  // LCD setup
+  lcd.begin(16, 2);
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Smart Notice Board");
+
+  // LED setup
+  pinMode(ledPin, OUTPUT);
+  digitalWrite(ledPin, LOW);
+
+  // WiFi
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
   if (WiFi.waitForConnectResult() != WL_CONNECTED) {
@@ -44,36 +69,52 @@ void setup() {
   Serial.println();
   Serial.print("IP Address: ");
   Serial.println(WiFi.localIP());
- 
+
+  // Root page
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
     request->send_P(200, "text/html", index_html);
   });
- 
+
+  // Handle text input
   server.on("/get", HTTP_GET, [] (AsyncWebServerRequest *request) {
     String message;
-    String inputParam;
     if (request->hasParam(PARAM_INPUT_1)) {
       message = request->getParam(PARAM_INPUT_1)->value();
-      inputParam = PARAM_INPUT_1;
-       lcd.clear();
-       lcd.setCursor(0,0);
-      
+      lcd.clear();
+      lcd.setCursor(0,0);
       lcd.print(message);
-    }
-    else {
+    } else {
       message = "No message sent";
-      inputParam = "none";
     }
-    Serial.println(message);
-   
-  request->send(200, "text/html", index_html);
+    Serial.println("LCD Message: " + message);
+    request->send(200, "text/html", index_html);
   });
+
+  // Handle LED control
+  server.on("/led", HTTP_GET, [] (AsyncWebServerRequest *request) {
+    if (request->hasParam("state")) {
+      String state = request->getParam("state")->value();
+      if (state == "on") {
+        digitalWrite(ledPin, HIGH);
+        Serial.println("LED ON");
+      } else {
+        digitalWrite(ledPin, LOW);
+        Serial.println("LED OFF");
+      }
+    }
+    request->send(200, "text/html", index_html);
+  });
+
+  // Not Found
   server.onNotFound(notFound);
+
+  // Start server
   server.begin();
 }
- 
+
 void loop() {
-    for (int positionCounter = 0; positionCounter < 29; positionCounter++) {
+  // Scroll LCD text
+  for (int positionCounter = 0; positionCounter < 29; positionCounter++) {
     lcd.scrollDisplayLeft();
     delay(500);
   }
